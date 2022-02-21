@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:toggle_switch/toggle_switch.dart';
@@ -21,35 +20,12 @@ class Graph extends StatefulWidget {
 
 class _GraphState extends State<Graph> {
   late ChartSeriesController _chartSeriesController;
-  final channel = IOWebSocketChannel.connect(
-      Uri.parse('wss://ws.binaryws.com/websockets/v3?app_id=1089'));
-  final channel2 = IOWebSocketChannel.connect(
-      Uri.parse('wss://ws.binaryws.com/websockets/v3?app_id=1089'));
 
   String symbolName = "Volatility 50 Index";
   String symbol = "R_50";
-  List<tickHistory> priceTime = [];
-
-  void getTickHistory() {
-    String request1 =
-        '{"ticks_history": "$symbol" ,"count": 50,"end": "latest"}';
-    channel.sink.add(request1);
-    print("first request sent");
-  }
-
-  void getTickStream() {
-    String request2 = '{"ticks": "R_50","subscribe": 1}';
-    channel2.sink.add(request2);
-    print("second request sent");
-  }
 
   @override
   void initState() {
-    getTickHistory();
-    InitialTicks();
-    getTickStream();
-
-    tickStream();
     super.initState();
   }
 
@@ -60,6 +36,7 @@ class _GraphState extends State<Graph> {
 
   @override
   Widget build(BuildContext context) {
+    int counts = 4;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 80,
@@ -77,65 +54,12 @@ class _GraphState extends State<Graph> {
       body: Column(
         children: [
           SizedBox(
-            height: 400,
-            width: double.infinity,
-            child: SfCartesianChart(
-              margin: EdgeInsets.only(top: 20.0, left: 8.0),
-              enableAxisAnimation: true,
-              plotAreaBackgroundColor: Colors.black,
-
-              zoomPanBehavior: ZoomPanBehavior(
-                selectionRectColor: Colors.red,
-                zoomMode: ZoomMode.x,
-                enablePanning: true,
-                enableDoubleTapZooming: true,
-                enablePinching: true,
-              ),
-              primaryXAxis: CategoryAxis(
-                maximumLabels: 5,
-                isVisible: true,
-                majorGridLines: MajorGridLines(width: 0),
-                labelStyle: TextStyle(color: Colors.white),
-                labelPlacement: LabelPlacement.onTicks,
-                labelPosition: ChartDataLabelPosition.inside,
-              ),
-              primaryYAxis: NumericAxis(
-                maximumLabels: 5,
-                interval: 0.1,
-                majorGridLines: MajorGridLines(width: 0),
-                labelPosition: ChartDataLabelPosition.inside,
-                labelStyle: TextStyle(color: Colors.white),
-                opposedPosition: true,
-              ),
-
-              // Chart title
-
-              tooltipBehavior: TooltipBehavior(
-                tooltipPosition: TooltipPosition.auto,
-                color: Colors.red,
-                elevation: 10,
-                enable: true,
-                format: 'point.y at point.x',
-                shouldAlwaysShow: true,
-                canShowMarker: true,
-              ),
-              series: <ChartSeries<tickHistory, String>>[
-                LineSeries<tickHistory, String>(
-                  onRendererCreated: (ChartSeriesController controller) {
-                    _chartSeriesController:
-                    controller;
-                  },
-                  color: Colors.grey,
-                  enableTooltip: true,
-                  dataSource: priceTime,
-                  xValueMapper: (tickHistory ticks, _) => ticks.time,
-                  yValueMapper: (tickHistory ticks, _) => ticks.price,
-                  name: 'Ticks',
-                  // Enable data label
-                ),
-              ],
-            ),
-          ),
+              height: 400,
+              width: double.infinity,
+              child: chartBuilder(
+                symbol: symbol,
+                counts: counts,
+              )),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -156,10 +80,12 @@ class _GraphState extends State<Graph> {
                 inactiveBgColor: Colors.grey.shade400,
                 activeFgColor: Colors.black,
                 activeBgColor: [Colors.grey],
-                initialLabelIndex: 0,
+                initialLabelIndex: 4,
                 totalSwitches: 4,
-                labels: ['1 Day', '7 Day', '30 Days', '1 Year'],
-                onToggle: (index) {},
+                labels: ['1 Hour', '1 Day', '7 Days', '30 Days'],
+                onToggle: (index) {
+                  counts = index as int;
+                },
               )
             ],
           ),
@@ -232,65 +158,4 @@ class _GraphState extends State<Graph> {
       ),
     );
   }
-
-  void InitialTicks() {
-    channel.stream.listen((data) {
-      // Decodes the response to JSON format
-      var price = jsonDecode(data);
-      // initialize
-      List<dynamic> timeConverted = [];
-
-      for (int i = 0; i <= price['history']['times'].length - 1; i++) {
-        // Converts epoch to DateTimestamp format
-        timeConverted.add(DateTime.fromMillisecondsSinceEpoch(
-            price['history']['times'][i] * 1000));
-
-        // extract time only
-        String extractedTime = DateFormat.Hms().format(timeConverted[i]);
-        priceTime.add(
-          tickHistory(
-            time: extractedTime,
-            price: price['history']['prices'][i],
-          ),
-        );
-      }
-
-      channel.sink.close();
-    });
-  }
-
-  void tickStream() {
-    channel2.stream.listen((data) {
-      var tickStream = jsonDecode(data);
-      DateTime timeConverted = DateTime.now();
-
-      setState(() {
-        timeConverted = DateTime.fromMillisecondsSinceEpoch(
-            tickStream['tick']['epoch'] * 1000);
-
-        String extractedTime = DateFormat.Hms().format(timeConverted);
-
-        priceTime.add(
-          tickHistory(
-            time: extractedTime,
-            price: tickStream['tick']['quote'],
-          ),
-        );
-        priceTime.removeAt(0);
-      });
-    });
-  }
-}
-
-class tickHistory {
-  final String time;
-  final double price;
-
-  tickHistory({
-    required this.time,
-    required this.price,
-  });
-
-  @override
-  String toString() => '[ $time , $price ]';
 }
