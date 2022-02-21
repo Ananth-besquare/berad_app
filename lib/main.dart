@@ -40,7 +40,7 @@ class _HomePageState extends State<HomePage> {
             MaterialPageRoute(builder: (context) => Graph()),
           );
         },
-        child: Text("Click Here"),
+        child: Text("Click me"),
       ),
     );
   }
